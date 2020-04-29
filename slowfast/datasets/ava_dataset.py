@@ -54,33 +54,30 @@ class Ava(torch.utils.data.Dataset):
             cfg (CfgNode): config
         """
         # Loading frame paths.
-        self._image_paths, self._video_idx_to_name = ava_helper.load_image_lists(
+        self._image_paths, self._video_idx_to_name, self.labels = ava_helper.load_image_lists(
             cfg, is_train=(self._split == "train")
         )
-
         # Loading annotations for boxes and labels.
-        boxes_and_labels = ava_helper.load_boxes_and_labels(
-            cfg, mode=self._split
-        )
-
-        assert len(boxes_and_labels) == len(self._image_paths)
-
-        boxes_and_labels = [
-            boxes_and_labels[self._video_idx_to_name[i]]
-            for i in range(len(self._image_paths))
-        ]
+        # boxes_and_labels = ava_helper.load_boxes_and_labels(
+        #     cfg, mode=self._split
+        # )
+        # assert len(boxes_and_labels) == len(self._image_paths)
+        # print(self.labels)
+        # boxes_and_labels = [
+        #     boxes_and_labels[self._video_idx_to_name[i]]
+        #     for i in range(len(self._image_paths))
+        # ]
 
         # Get indices of keyframes and corresponding boxes and labels.
         (
             self._keyframe_indices,
             self._keyframe_boxes_and_labels,
-        ) = ava_helper.get_keyframe_data(boxes_and_labels)
+        ) = ava_helper.get_keyframe_data(self.labels)
 
         # Calculate the number of used boxes.
-        self._num_boxes_used = ava_helper.get_num_boxes_used(
-            self._keyframe_indices, self._keyframe_boxes_and_labels
-        )
-
+        # self._num_boxes_used = ava_helper.get_num_boxes_used(
+        #     self._keyframe_indices, self._keyframe_boxes_and_labels
+        # )
         self.print_summary()
 
     def print_summary(self):
@@ -92,7 +89,7 @@ class Ava(torch.utils.data.Dataset):
         )
         logger.info("Number of frames: {}".format(total_frames))
         logger.info("Number of key frames: {}".format(len(self)))
-        logger.info("Number of boxes: {}.".format(self._num_boxes_used))
+        # logger.info("Number of boxes: {}.".format(self._num_boxes_used))
 
     def __len__(self):
         return len(self._keyframe_indices)
@@ -350,7 +347,9 @@ class Ava(torch.utils.data.Dataset):
             extra_data (dict): a dict containing extra data fields, like "boxes",
                 "ori_boxes" and "metadata".
         """
-        video_idx, sec_idx, sec, center_idx = self._keyframe_indices[idx]
+        print(self._keyframe_indices, idx)
+
+        video_idx, label, start_idx, end_idx = self._keyframe_indices[idx]
         # Get the frame idxs for current clip.
         seq = utils.get_sequence(
             center_idx,
@@ -411,5 +410,67 @@ class Ava(torch.utils.data.Dataset):
             "ori_boxes": ori_boxes,
             "metadata": metadata,
         }
+
+        # video_idx, sec_idx, sec, center_idx = self._keyframe_indices[idx]
+        # # Get the frame idxs for current clip.
+        # seq = utils.get_sequence(
+        #     center_idx,
+        #     self._seq_len // 2,
+        #     self._sample_rate,
+        #     num_frames=len(self._image_paths[video_idx]),
+        # )
+
+        # clip_label_list = self._keyframe_boxes_and_labels[video_idx][sec_idx]
+        # assert len(clip_label_list) > 0
+
+        # # Get boxes and labels for current clip.
+        # boxes = []
+        # labels = []
+        # for box_labels in clip_label_list:
+        #     boxes.append(box_labels[0])
+        #     labels.append(box_labels[1])
+        # boxes = np.array(boxes)
+        # # Score is not used.
+        # boxes = boxes[:, :4].copy()
+        # ori_boxes = boxes.copy()
+
+        # # Load images of current clip.
+        # image_paths = [self._image_paths[video_idx][frame] for frame in seq]
+        # imgs = utils.retry_load_images(
+        #     image_paths, backend=self.cfg.AVA.IMG_PROC_BACKEND
+        # )
+        # if self.cfg.AVA.IMG_PROC_BACKEND == "pytorch":
+        #     # T H W C -> T C H W.
+        #     imgs = imgs.permute(0, 3, 1, 2)
+        #     # Preprocess images and boxes.
+        #     imgs, boxes = self._images_and_boxes_preprocessing(
+        #         imgs, boxes=boxes
+        #     )
+        #     # T C H W -> C T H W.
+        #     imgs = imgs.permute(1, 0, 2, 3)
+        # else:
+        #     # Preprocess images and boxes
+        #     imgs, boxes = self._images_and_boxes_preprocessing_cv2(
+        #         imgs, boxes=boxes
+        #     )
+
+        # # Construct label arrays.
+        # label_arrs = np.zeros((len(labels), self._num_classes), dtype=np.int32)
+        # for i, box_labels in enumerate(labels):
+        #     # AVA label index starts from 1.
+        #     for label in box_labels:
+        #         if label == -1:
+        #             continue
+        #         assert label >= 1 and label <= 80
+        #         label_arrs[i][label - 1] = 1
+
+        # imgs = utils.pack_pathway_output(self.cfg, imgs)
+        # metadata = [[video_idx, sec]] * len(boxes)
+
+        # extra_data = {
+        #     "boxes": boxes,
+        #     "ori_boxes": ori_boxes,
+        #     "metadata": metadata,
+        # }
 
         return imgs, label_arrs, idx, extra_data
