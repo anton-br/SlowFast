@@ -14,7 +14,7 @@ The goal of PySlowFast is to provide a high-performance, light-weight pytorch co
 - Slow
 - C2D
 - I3D
-- Non-local Network
+- Non-local  Network
 
 ## Updates
 
