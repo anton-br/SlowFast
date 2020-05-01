@@ -245,10 +245,10 @@ class Ava(torch.utils.data.Dataset):
 
         height, width = imgs.shape[2], imgs.shape[3]
         # The format of boxes is [x1, y1, x2, y2]. The input boxes are in the
-        # range of [0, 1].
-        boxes[:, [0, 2]] *= width
-        boxes[:, [1, 3]] *= height
-        boxes = transform.clip_boxes_to_image(boxes, height, width)
+        # # range of [0, 1].
+        # boxes[:, [0, 2]] *= width
+        # boxes[:, [1, 3]] *= height
+        # boxes = transform.clip_boxes_to_image(boxes, height, width)
 
         if self._split == "train":
             # Train split
@@ -327,9 +327,9 @@ class Ava(torch.utils.data.Dataset):
             # Note that Kinetics pre-training uses RGB!
             imgs = imgs[:, [2, 1, 0], ...]
 
-        boxes = transform.clip_boxes_to_image(
-            boxes, self._crop_size, self._crop_size
-        )
+        # boxes = transform.clip_boxes_to_image(
+        #     boxes, self._crop_size, self._crop_size
+        # )
 
         return imgs, boxes
 
@@ -347,69 +347,78 @@ class Ava(torch.utils.data.Dataset):
             extra_data (dict): a dict containing extra data fields, like "boxes",
                 "ori_boxes" and "metadata".
         """
-        print(self._keyframe_indices, idx)
 
-        video_idx, label, start_idx, end_idx = self._keyframe_indices[idx]
+        video_idx, labels, start_idx, end_idx = self._keyframe_indices[idx]
+
         # Get the frame idxs for current clip.
-        seq = utils.get_sequence(
-            center_idx,
-            self._seq_len // 2,
-            self._sample_rate,
-            num_frames=len(self._image_paths[video_idx]),
-        )
+        # seq = utils.get_sequence(
+        #     center_idx,
+        #     self._seq_len // 2,
+        #     self._sample_rate,
+        #     num_frames=len(self._image_paths[video_idx]),
+        # )
 
-        clip_label_list = self._keyframe_boxes_and_labels[video_idx][sec_idx]
-        assert len(clip_label_list) > 0
+        # print(self._keyframe_boxes_and_labels[video_idx][sec_idx], self._keyframe_boxes_and_labels)
+        # clip_label_list = self._keyframe_boxes_and_labels[video_idx][sec_idx]
+        # assert len(clip_label_list) > 0
 
-        # Get boxes and labels for current clip.
-        boxes = []
-        labels = []
-        for box_labels in clip_label_list:
-            boxes.append(box_labels[0])
-            labels.append(box_labels[1])
-        boxes = np.array(boxes)
-        # Score is not used.
-        boxes = boxes[:, :4].copy()
-        ori_boxes = boxes.copy()
+        # # Get boxes and labels for current clip.
+        # boxes = []
+        # labels = []
+        # for box_labels in clip_label_list:
+        #     boxes.append(box_labels[0])
+        #     labels.append(box_labels[1])
+        # boxes = np.array(boxes)
+        # # Score is not used.
+        # boxes = boxes[:, :4].copy()
+        # ori_boxes = boxes.copy()
 
         # Load images of current clip.
-        image_paths = [self._image_paths[video_idx][frame] for frame in seq]
+        image_paths = [self._image_paths[video_idx][frame] for frame in range(start_idx, end_idx+1)]
         imgs = utils.retry_load_images(
             image_paths, backend=self.cfg.AVA.IMG_PROC_BACKEND
         )
+        imgs = imgs[:30]
+        if len(imgs) < 30:
+            ln = 30 - len(imgs)
+            imgs = torch.stack([*imgs, *imgs[:ln]], dim=0)
+            print(imgs.shape)
         if self.cfg.AVA.IMG_PROC_BACKEND == "pytorch":
             # T H W C -> T C H W.
             imgs = imgs.permute(0, 3, 1, 2)
             # Preprocess images and boxes.
-            imgs, boxes = self._images_and_boxes_preprocessing(
-                imgs, boxes=boxes
+            imgs, _ = self._images_and_boxes_preprocessing(
+                imgs, boxes=None
             )
             # T C H W -> C T H W.
             imgs = imgs.permute(1, 0, 2, 3)
         else:
             # Preprocess images and boxes
             imgs, boxes = self._images_and_boxes_preprocessing_cv2(
-                imgs, boxes=boxes
+                imgs, boxes=None
             )
 
-        # Construct label arrays.
-        label_arrs = np.zeros((len(labels), self._num_classes), dtype=np.int32)
-        for i, box_labels in enumerate(labels):
-            # AVA label index starts from 1.
-            for label in box_labels:
-                if label == -1:
-                    continue
-                assert label >= 1 and label <= 80
-                label_arrs[i][label - 1] = 1
+        # # Construct label arrays.
+        # label_arrs = np.zeros((len(labels), self._num_classes), dtype=np.int32)
+        # for i, box_labels in enumerate(labels):
+        #     # AVA label index starts from 1.
+        #     for label in box_labels:
+        #         if label == -1:
+        #             continue
+        #         assert label >= 1 and label <= 80
+        #         label_arrs[i][label - 1] = 1
 
-        imgs = utils.pack_pathway_output(self.cfg, imgs)
-        metadata = [[video_idx, sec]] * len(boxes)
+        # imgs = utils.pack_pathway_output(self.cfg, imgs)
 
-        extra_data = {
-            "boxes": boxes,
-            "ori_boxes": ori_boxes,
-            "metadata": metadata,
-        }
+        # print(imgs.shape)
+        return imgs, labels, idx#, extra_data
+        # metadata = [[video_idx, sec]] * len(boxes)
+
+        # extra_data = {
+        #     "boxes": boxes,
+        #     "ori_boxes": ori_boxes,
+        #     "metadata": metadata,
+        # }
 
         # video_idx, sec_idx, sec, center_idx = self._keyframe_indices[idx]
         # # Get the frame idxs for current clip.
@@ -473,4 +482,4 @@ class Ava(torch.utils.data.Dataset):
         #     "metadata": metadata,
         # }
 
-        return imgs, label_arrs, idx, extra_data
+        # return imgs, label_arrs, idx, extra_data
