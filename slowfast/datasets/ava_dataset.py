@@ -243,7 +243,7 @@ class Ava(torch.utils.data.Dataset):
         imgs = imgs.float()
         imgs = imgs / 255.0
 
-        height, width = imgs.shape[2], imgs.shape[3]
+        # height, width = imgs.shape[2], imgs.shape[3]
         # The format of boxes is [x1, y1, x2, y2]. The input boxes are in the
         # # range of [0, 1].
         # boxes[:, [0, 2]] *= width
@@ -379,10 +379,14 @@ class Ava(torch.utils.data.Dataset):
             image_paths, backend=self.cfg.AVA.IMG_PROC_BACKEND
         )
         imgs = imgs[:30]
-        if len(imgs) < 30:
-            ln = 30 - len(imgs)
-            imgs = torch.stack([*imgs, *imgs[:ln]], dim=0)
-            print(imgs.shape)
+        labels = np.zeros(30) + labels
+        imgs_len = len(imgs)
+        if imgs_len < 30:
+            if imgs_len > 15:
+                ln = 30 - imgs_len
+                imgs = torch.stack([*imgs, *imgs[:ln]], dim=0)
+            else:
+                imgs = torch.stack([*imgs, *imgs, *imgs], dim=0)[:30]
         if self.cfg.AVA.IMG_PROC_BACKEND == "pytorch":
             # T H W C -> T C H W.
             imgs = imgs.permute(0, 3, 1, 2)
@@ -408,7 +412,7 @@ class Ava(torch.utils.data.Dataset):
         #         assert label >= 1 and label <= 80
         #         label_arrs[i][label - 1] = 1
 
-        # imgs = utils.pack_pathway_output(self.cfg, imgs)
+        imgs = utils.pack_pathway_output(self.cfg, imgs)
 
         # print(imgs.shape)
         return imgs, labels, idx#, extra_data
