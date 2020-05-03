@@ -40,20 +40,20 @@ def train_epoch(train_loader, model, optimizer, train_meter, cur_epoch, cfg):
     train_meter.iter_tic()
     data_size = len(train_loader)
 
-    for cur_iter, (inputs, labels, _, meta) in enumerate(train_loader):
+    for cur_iter, (inputs, labels, _) in enumerate(train_loader):
         # Transfer the data to the current GPU device.
         if isinstance(inputs, (list,)):
             for i in range(len(inputs)):
                 inputs[i] = inputs[i].cuda(non_blocking=True)
         else:
             inputs = inputs.cuda(non_blocking=True)
-        labels = labels.cuda()
-        for key, val in meta.items():
-            if isinstance(val, (list,)):
-                for i in range(len(val)):
-                    val[i] = val[i].cuda(non_blocking=True)
-            else:
-                meta[key] = val.cuda(non_blocking=True)
+        labels = labels.cuda(non_blocking=True)
+        # for key, val in meta.items():
+        #     if isinstance(val, (list,)):
+        #         for i in range(len(val)):
+        #             val[i] = val[i].cuda(non_blocking=True)
+        #     else:
+        #         meta[key] = val.cuda(non_blocking=True)
 
         # Update the learning rate.
         lr = optim.get_epoch_lr(cur_epoch + float(cur_iter) / data_size, cfg)
@@ -148,20 +148,14 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg):
     model.eval()
     val_meter.iter_tic()
 
-    for cur_iter, (inputs, labels, _, meta) in enumerate(val_loader):
-        # Transferthe data to the current GPU device.
+    for cur_iter, (inputs, labels, _) in enumerate(val_loader):
+        # Transfer the data to the current GPU device.
         if isinstance(inputs, (list,)):
             for i in range(len(inputs)):
                 inputs[i] = inputs[i].cuda(non_blocking=True)
         else:
             inputs = inputs.cuda(non_blocking=True)
-        labels = labels.cuda()
-        for key, val in meta.items():
-            if isinstance(val, (list,)):
-                for i in range(len(val)):
-                    val[i] = val[i].cuda(non_blocking=True)
-            else:
-                meta[key] = val.cuda(non_blocking=True)
+        labels = labels.cuda(non_blocking=True)
 
         if cfg.DETECTION.ENABLE:
             # Compute the predictions.
@@ -254,7 +248,7 @@ def train(cfg):
 
     # Print config.
     logger.info("Train with config:")
-    logger.info(pprint.pformat(cfg))
+    # logger.info(pprint.pformat(cfg))
 
     # Build the video model and print model statistics.
     model = build_model(cfg)
@@ -320,3 +314,5 @@ def train(cfg):
         # Evaluate the model on validation set.
         if misc.is_eval_epoch(cfg, cur_epoch):
             eval_epoch(val_loader, model, val_meter, cur_epoch, cfg)
+
+    return model
