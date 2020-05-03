@@ -378,8 +378,8 @@ class Ava(torch.utils.data.Dataset):
         imgs = utils.retry_load_images(
             image_paths, backend=self.cfg.AVA.IMG_PROC_BACKEND
         )
+        labels -= 1
         imgs = imgs[:30]
-        labels = np.zeros(30) + labels
         imgs_len = len(imgs)
         if imgs_len < 30:
             if imgs_len > 15:
