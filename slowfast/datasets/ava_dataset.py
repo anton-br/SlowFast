@@ -316,11 +316,11 @@ class Ava(torch.utils.data.Dataset):
             )
 
         # Normalize images by mean and std.
-        imgs = transform.color_normalization(
-            imgs,
-            np.array(self._data_mean, dtype=np.float32),
-            np.array(self._data_std, dtype=np.float32),
-        )
+        # imgs = transform.color_normalization(
+        #     imgs,
+        #     np.array(self._data_mean, dtype=np.float32),
+        #     np.array(self._data_std, dtype=np.float32),
+        # )
 
         if not self._use_bgr:
             # Convert image format from BGR to RGB.
@@ -387,6 +387,8 @@ class Ava(torch.utils.data.Dataset):
                 imgs = torch.stack([*imgs, *imgs[:ln]], dim=0)
             else:
                 imgs = torch.stack([*imgs, *imgs, *imgs], dim=0)[:30]
+                if len(imgs) < 30:
+                    print(video_idx, start_idx, end_idx)
         if self.cfg.AVA.IMG_PROC_BACKEND == "pytorch":
             # T H W C -> T C H W.
             imgs = imgs.permute(0, 3, 1, 2)
@@ -411,7 +413,6 @@ class Ava(torch.utils.data.Dataset):
         #             continue
         #         assert label >= 1 and label <= 80
         #         label_arrs[i][label - 1] = 1
-
         imgs = utils.pack_pathway_output(self.cfg, imgs)
 
         # print(imgs.shape)

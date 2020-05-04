@@ -182,18 +182,19 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg):
                 val_meter.update_predictions(preds, labels)
             else:
                 # Compute the errors.
-                num_topks_correct = metrics.topks_correct(preds, labels, (1, 5))
+                num_topks_correct = metrics.topks_correct(preds, labels, (1,))
 
                 # Combine the errors across the GPUs.
-                top1_err, top5_err = [
-                    (1.0 - x / preds.size(0)) * 100.0 for x in num_topks_correct
-                ]
+                rop1_err = (1.0 - num_topks_correct[0] / preds.size(0)) * 100.0
+                # top1_err, top5_err = [
+                #     (1.0 - x / preds.size(0)) * 100.0 for x in num_topks_correct
+                # ]
                 if cfg.NUM_GPUS > 1:
-                    top1_err, top5_err = du.all_reduce([top1_err, top5_err])
+                    top1_err = du.all_reduce([top1_err])
 
                 # Copy the errors from GPU to CPU (sync point).
-                top1_err, top5_err = top1_err.item(), top5_err.item()
-
+                # top1_err, top5_err = top1_err.item(), top5_err.item()
+                top1_err = top1_err.item()
                 val_meter.iter_toc()
                 # Update and log stats.
                 val_meter.update_stats(
