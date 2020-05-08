@@ -8,6 +8,14 @@ import torch.nn as nn
 from slowfast.models.nonlocal_helper import Nonlocal
 
 
+import math
+
+import torch.nn as nn
+from torch.nn.modules.utils import _triple
+
+
+
+
 def get_trans_func(name):
     """
     Retrieves the transformation module by name.
@@ -20,6 +28,68 @@ def get_trans_func(name):
         name in trans_funcs.keys()
     ), "Transformation function '{}' not supported".format(name)
     return trans_funcs[name]
+
+
+# This class is based on https://github.com/irhum/R2Plus1D-PyTorch
+# based on the work (2+1)R https://arxiv.org/pdf/1711.11248.pdf
+class SpatioTemporalConv(nn.Module):
+    r"""Applies a factored 3D convolution over an input signal composed of several input
+    planes with distinct spatial and time axes, by performing a 2D convolution over the
+    spatial axes to an intermediate subspace, followed by a 1D convolution over the time
+    axis to produce the final output.
+    Args:
+        in_channels (int): Number of channels in the input tensor
+        out_channels (int): Number of channels produced by the convolution
+        kernel_size (int or tuple): Size of the convolving kernel
+        stride (int or tuple, optional): Stride of the convolution. Default: 1
+        padding (int or tuple, optional): Zero-padding added to the sides of the input during their respective convolutions. Default: 0
+        bias (bool, optional): If ``True``, adds a learnable bias to the output. Default: ``True``
+    """
+
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, bias=True, **kwargs):
+        super(SpatioTemporalConv, self).__init__()
+
+        # if ints are entered, convert them to iterables, 1 -> [1, 1, 1]
+        kernel_size = _triple(kernel_size)
+        stride = _triple(stride)
+        padding = _triple(padding)
+
+        # decomposing the parameters into spatial and temporal components by
+        # masking out the values with the defaults on the axis that
+        # won't be convolved over. This is necessary to avoid unintentional
+        # behavior such as padding being added twice
+        spatial_kernel_size =  [1, kernel_size[1], kernel_size[2]]
+        spatial_stride =  [1, stride[1], stride[2]]
+        spatial_padding =  [0, padding[1], padding[2]]
+
+        temporal_kernel_size = [kernel_size[0], 1, 1]
+        temporal_stride =  [stride[0], 1, 1]
+        temporal_padding =  [padding[0], 0, 0]
+
+        # compute the number of intermediary channels (M) using formula
+        # from the paper section 3.5
+        intermed_channels = int(math.floor((kernel_size[0] * kernel_size[1] * kernel_size[2] * in_channels * out_channels)/ \
+                            (kernel_size[1]* kernel_size[2] * in_channels + kernel_size[0] * out_channels)))
+
+        # the spatial conv is effectively a 2D conv due to the
+        # spatial_kernel_size, followed by batch_norm and ReLU
+        self.spatial_conv = nn.Conv3d(in_channels, intermed_channels, spatial_kernel_size,
+                                    stride=spatial_stride, padding=spatial_padding, bias=bias, **kwargs)
+        self.bn = nn.BatchNorm3d(intermed_channels)
+        self.relu = nn.ReLU()
+
+        # the temporal conv is effectively a 1D conv, but has batch norm
+        # and ReLU added inside the model constructor, not here. This is an
+        # intentional design choice, to allow this module to externally act
+        # identical to a standard Conv3D, so it can be reused easily in any
+        # other codebase
+        self.temporal_conv = nn.Conv3d(intermed_channels, out_channels, temporal_kernel_size,
+                                       stride=temporal_stride, padding=temporal_padding, bias=bias, **kwargs)
+
+    def forward(self, x):
+        x = self.relu(self.bn(self.spatial_conv(x)))
+        x = self.temporal_conv(x)
+        return x
 
 
 class BasicTransform(nn.Module):
@@ -70,7 +140,7 @@ class BasicTransform(nn.Module):
 
     def _construct(self, dim_in, dim_out, stride, norm_module):
         # Tx3x3, BN, ReLU.
-        self.a = nn.Conv3d(
+        self.a = SpatioTemporalConv(#nn.Conv3d(
             dim_in,
             dim_out,
             kernel_size=[self.temp_kernel_size, 3, 3],
@@ -83,7 +153,7 @@ class BasicTransform(nn.Module):
         )
         self.a_relu = nn.ReLU(inplace=self._inplace_relu)
         # 1x3x3, BN.
-        self.b = nn.Conv3d(
+        self.b = SpatioTemporalConv(#nn.Conv3d(
             dim_out,
             dim_out,
             kernel_size=[1, 3, 3],
@@ -179,7 +249,7 @@ class BottleneckTransform(nn.Module):
         (str1x1, str3x3) = (stride, 1) if self._stride_1x1 else (1, stride)
 
         # Tx1x1, BN, ReLU.
-        self.a = nn.Conv3d(
+        self.a = SpatioTemporalConv(#nn.Conv3d(
             dim_in,
             dim_inner,
             kernel_size=[self.temp_kernel_size, 1, 1],
@@ -193,7 +263,7 @@ class BottleneckTransform(nn.Module):
         self.a_relu = nn.ReLU(inplace=self._inplace_relu)
 
         # 1x3x3, BN, ReLU.
-        self.b = nn.Conv3d(
+        self.b = SpatioTemporalConv(#nn.Conv3d(
             dim_inner,
             dim_inner,
             [1, 3, 3],
@@ -209,7 +279,7 @@ class BottleneckTransform(nn.Module):
         self.b_relu = nn.ReLU(inplace=self._inplace_relu)
 
         # 1x1x1, BN.
-        self.c = nn.Conv3d(
+        self.c = SpatioTemporalConv(#nn.Conv3d(
             dim_inner,
             dim_out,
             kernel_size=[1, 1, 1],
@@ -323,7 +393,7 @@ class ResBlock(nn.Module):
     ):
         # Use skip connection with projection if dim or res change.
         if (dim_in != dim_out) or (stride != 1):
-            self.branch1 = nn.Conv3d(
+            self.branch1 = SpatioTemporalConv(#nn.Conv3d(
                 dim_in,
                 dim_out,
                 kernel_size=1,
