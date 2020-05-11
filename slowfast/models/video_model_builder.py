@@ -349,7 +349,7 @@ class SlowFast(nn.Module):
                 act_func=cfg.MODEL.HEAD_ACT,
                 aligned=cfg.DETECTION.ALIGNED,
             )
-        else:
+        elif cfg.DATA.LABELS_TYPE == 'class':
             self.head = head_helper.ResNetBasicHead(
                 dim_in=[
                     width_per_group * 32,
@@ -358,9 +358,7 @@ class SlowFast(nn.Module):
                 num_classes=cfg.MODEL.NUM_CLASSES,
                 pool_size=[
                     [
-                        cfg.DATA.NUM_FRAMES
-                        // cfg.SLOWFAST.ALPHA
-                        // pool_size[0][0],
+                        cfg.DATA.NUM_FRAMES // cfg.SLOWFAST.ALPHA // pool_size[0][0],
                         cfg.DATA.CROP_SIZE // 16 // pool_size[0][1],
                         cfg.DATA.CROP_SIZE // 16 // pool_size[0][2],
                     ],
@@ -372,7 +370,34 @@ class SlowFast(nn.Module):
                 ],
                 dropout_rate=cfg.MODEL.DROPOUT_RATE,
                 act_func=cfg.MODEL.HEAD_ACT,
+                labels_type=cfg.DATA.LABELS_TYPE
             )
+        elif cfg.DATA.LABELS_TYPE == 'mask':
+            self.head = head_helper.ResNetMaskHead(
+                dim_in=[
+                    width_per_group * 32,
+                    width_per_group * 32 // cfg.SLOWFAST.BETA_INV,
+                ],
+                num_classes=cfg.MODEL.NUM_CLASSES,
+                pool_size=[
+                    [
+                        1,
+                        cfg.DATA.CROP_SIZE // 16 // pool_size[0][1],
+                        cfg.DATA.CROP_SIZE // 16 // pool_size[0][2],
+                    ],
+                    [
+                        1,
+                        cfg.DATA.CROP_SIZE // 16 // pool_size[1][1],
+                        cfg.DATA.CROP_SIZE // 16 // pool_size[1][2],
+                    ],
+                ],
+                dropout_rate=cfg.MODEL.DROPOUT_RATE,
+                act_func=cfg.MODEL.HEAD_ACT,
+                labels_type=cfg.DATA.LABELS_TYPE
+            )
+        else:
+            raise ValueError('Wrong labels type')
+
 # [
 #                         1,
 #                         cfg.DATA.CROP_SIZE // 16 // pool_size[0][1],

@@ -228,6 +228,9 @@ _C.SLOWFAST.FUSION_KERNEL_SZ = 5
 # -----------------------------------------------------------------------------
 _C.DATA = CfgNode()
 
+# Type on the labels. Should be whether 'class' or 'mask'
+_C.DATA.LABELS_TYPE = "class"
+
 # The path to the data directory.
 _C.DATA.PATH_TO_DATA_DIR = ""
 

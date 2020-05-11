@@ -5,6 +5,8 @@ import logging
 import os
 from collections import defaultdict
 
+import numpy as np
+
 logger = logging.getLogger(__name__)
 
 FPS = 30
@@ -152,7 +154,7 @@ def load_boxes_and_labels(cfg, mode):
     return all_boxes
 
 
-def get_keyframe_data(boxes_and_labels):
+def get_keyframe_data(boxes_and_labels, type_labels, seq_len):
     """
     Getting keyframe indices, boxes and labels in the dataset.
 
@@ -165,14 +167,6 @@ def get_keyframe_data(boxes_and_labels):
         keyframe_boxes_and_labels (list[list[list]]): a list of list which maps from
             video_idx and sec_idx to a list of boxes and corresponding labels.
     """
-
-    def sec_to_frame(sec):
-        """
-        Convert time index (in second) to frame index.
-        0: 900
-        30: 901
-        """
-        return (sec - 900) * FPS
 
     keyframe_indices = []
     keyframe_boxes_and_labels = []
@@ -187,12 +181,30 @@ def get_keyframe_data(boxes_and_labels):
                 current_label = label
 
             if label != current_label:
-                keyframe_indices.append(
-                    (video_idx, current_label, ix_st, sec)
-                )
-                keyframe_boxes_and_labels[video_idx].append(
-                    label
-                )
+                if type_labels == 'class':
+                    keyframe_indices.append(
+                        (video_idx, current_label, ix_st, sec)
+                    )
+                    keyframe_boxes_and_labels[video_idx].append(
+                        label
+                    )
+                elif type_labels == 'mask':
+                    if seq_len <= (sec - ix_st):
+                        left_ix = ix_st
+                        right_ix = ix_st + seq_len
+                    else:
+                        max_off = seq_len - (sec - ix_st)
+                        offset = np.random.randint(0, max_off)
+                        left_ix = ix_st - offset
+                        right_ix = sec + (max_off - offset)
+
+                    labels = np.array(boxes_and_labels[video_idx][left_ix: right_ix])
+                    keyframe_indices.append(
+                        (video_idx, labels, left_ix, right_ix)
+                    )
+                    keyframe_boxes_and_labels[video_idx].append(
+                        labels
+                    )
                 ix_st = -1
 
     return keyframe_indices, keyframe_boxes_and_labels

@@ -27,6 +27,7 @@ class Ava(torch.utils.data.Dataset):
         self._video_length = cfg.DATA.NUM_FRAMES
         self._seq_len = self._video_length * self._sample_rate
         self._num_classes = cfg.MODEL.NUM_CLASSES
+        self._labels_type = cfg.DATA.LABELS_TYPE
         # Augmentation params.
         self._data_mean = cfg.DATA.MEAN
         self._data_std = cfg.DATA.STD
@@ -67,12 +68,11 @@ class Ava(torch.utils.data.Dataset):
         #     boxes_and_labels[self._video_idx_to_name[i]]
         #     for i in range(len(self._image_paths))
         # ]
-
         # Get indices of keyframes and corresponding boxes and labels.
         (
             self._keyframe_indices,
             self._keyframe_boxes_and_labels,
-        ) = ava_helper.get_keyframe_data(self.labels)
+        ) = ava_helper.get_keyframe_data(self.labels, self._labels_type, self._seq_len)
 
         # Calculate the number of used boxes.
         # self._num_boxes_used = ava_helper.get_num_boxes_used(
@@ -374,21 +374,22 @@ class Ava(torch.utils.data.Dataset):
         # ori_boxes = boxes.copy()
 
         # Load images of current clip.
-        image_paths = [self._image_paths[video_idx][frame] for frame in range(start_idx, end_idx+1)]
+        image_paths = [self._image_paths[video_idx][frame] for frame in range(start_idx, end_idx)]
         imgs = utils.retry_load_images(
             image_paths, backend=self.cfg.AVA.IMG_PROC_BACKEND
         )
         labels -= 1
-        imgs = imgs[:30]
-        imgs_len = len(imgs)
-        if imgs_len < 30:
-            if imgs_len > 15:
-                ln = 30 - imgs_len
-                imgs = torch.stack([*imgs, *imgs[:ln]], dim=0)
-            else:
-                imgs = torch.stack([*imgs, *imgs, *imgs], dim=0)[:30]
-                if len(imgs) < 30:
-                    print(video_idx, start_idx, end_idx)
+        # print(len(imgs))
+        # imgs = imgs[:30]
+        # imgs_len = len(imgs)
+        # if imgs_len < 30:
+        #     if imgs_len > 15:
+        #         ln = 30 - imgs_len
+        #         imgs = torch.stack([*imgs, *imgs[:ln]], dim=0)
+        #     else:
+        #         imgs = torch.stack([*imgs, *imgs, *imgs], dim=0)[:30]
+        #         if len(imgs) < 30:
+        #             print(video_idx, start_idx, end_idx)
         if self.cfg.AVA.IMG_PROC_BACKEND == "pytorch":
             # T H W C -> T C H W.
             imgs = imgs.permute(0, 3, 1, 2)
