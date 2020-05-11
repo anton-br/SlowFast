@@ -4,6 +4,7 @@
 import logging
 import os
 from collections import defaultdict
+from fvcore.common.file_io import PathManager
 
 import numpy as np
 
@@ -38,7 +39,7 @@ def load_image_lists(cfg, is_train):
     video_idx_to_name = []
     labels = defaultdict(list)
     for list_filename in list_filenames:
-        with open(list_filename, "r") as f:
+        with PathManager.open(list_filename, "r") as f:
             f.readline()
             for line in f:
                 row = line.split('\n')[0].split(',')
@@ -98,7 +99,7 @@ def load_boxes_and_labels(cfg, mode):
     count = 0
     unique_box_count = 0
     for filename, is_gt_box in zip(ann_filenames, ann_is_gt_box):
-        with open(filename, "r") as f:
+        with PathManager.open(filename, "r") as f:
             for line in f:
                 row = line.strip().split(",")
                 # When we use predicted boxes to train/eval, we need to
