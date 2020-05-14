@@ -58,7 +58,7 @@ def load_image_lists(cfg, is_train):
                 image_paths[data_key].append(
                     os.path.join(cfg.AVA.FRAME_DIR, video_name + '_' + row[1]+'.jpg')
                 )
-                labels[data_key].append(int(row[2]))
+                labels[data_key].append(int(row[2]) - 1)
 
     image_paths = [image_paths[i] for i in range(len(image_paths))]
     logger.info(
@@ -196,8 +196,17 @@ def get_keyframe_data(boxes_and_labels, type_labels, seq_len):
                     else:
                         max_off = seq_len - (sec - ix_st)
                         offset = np.random.randint(0, max_off)
-                        left_ix = ix_st - offset
-                        right_ix = sec + (max_off - offset)
+                        if offset > ix_st:
+                            left_ix = 0
+                            right_ix = seq_len
+                        elif sec + (max_off - offset) > len(boxes_and_labels[video_idx]):
+                            right_ix = len(boxes_and_labels[video_idx])
+                            left_ix = right_ix - seq_len
+                            if left_ix < 0:
+                                raise ValueError(f'Given video is too short. Video idx: {video_idx}')
+                        else:
+                            left_ix = ix_st - offset
+                            right_ix = sec + (max_off - offset)
 
                     labels = np.array(boxes_and_labels[video_idx][left_ix: right_ix])
                     keyframe_indices.append(

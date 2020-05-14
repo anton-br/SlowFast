@@ -370,7 +370,6 @@ class SlowFast(nn.Module):
                 ],
                 dropout_rate=cfg.MODEL.DROPOUT_RATE,
                 act_func=cfg.MODEL.HEAD_ACT,
-                labels_type=cfg.DATA.LABELS_TYPE
             )
         elif cfg.DATA.LABELS_TYPE == 'mask':
             self.head = head_helper.ResNetMaskHead(
@@ -393,21 +392,10 @@ class SlowFast(nn.Module):
                 ],
                 dropout_rate=cfg.MODEL.DROPOUT_RATE,
                 act_func=cfg.MODEL.HEAD_ACT,
-                labels_type=cfg.DATA.LABELS_TYPE
             )
         else:
             raise ValueError('Wrong labels type')
 
-# [
-#                         1,
-#                         cfg.DATA.CROP_SIZE // 16 // pool_size[0][1],
-#                         cfg.DATA.CROP_SIZE // 16 // pool_size[0][2],
-#                     ],
-#                     [
-#                         1,
-#                         cfg.DATA.CROP_SIZE // 16 // pool_size[1][1],
-#                         cfg.DATA.CROP_SIZE // 16 // pool_size[1][2],
-#                     ]],
     def forward(self, x, bboxes=None):
         x = self.s1(x)
         x = self.s1_fuse(x)

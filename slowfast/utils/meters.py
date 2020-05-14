@@ -444,10 +444,10 @@ class TrainMeter(object):
         self.lr = None
         # Current minibatch errors (smoothed over a window).
         self.mb_top1_err = ScalarMeter(cfg.LOG_PERIOD)
-        self.mb_top5_err = ScalarMeter(cfg.LOG_PERIOD)
+        # self.mb_top5_err = ScalarMeter(cfg.LOG_PERIOD)
         # Number of misclassified examples.
         self.num_top1_mis = 0
-        self.num_top5_mis = 0
+        # self.num_top5_mis = 0
         self.num_samples = 0
 
     def reset(self):
@@ -458,9 +458,9 @@ class TrainMeter(object):
         self.loss_total = 0.0
         self.lr = None
         self.mb_top1_err.reset()
-        self.mb_top5_err.reset()
+        # self.mb_top5_err.reset()
         self.num_top1_mis = 0
-        self.num_top5_mis = 0
+        # self.num_top5_mis = 0
         self.num_samples = 0
 
     def iter_tic(self):
@@ -475,7 +475,7 @@ class TrainMeter(object):
         """
         self.iter_timer.pause()
 
-    def update_stats(self, top1_err, top5_err, loss, lr, mb_size):
+    def update_stats(self, top1_err, loss, lr, mb_size):
         """
         Update the current stats.
         Args:
@@ -493,10 +493,10 @@ class TrainMeter(object):
         if not self._cfg.DATA.MULTI_LABEL:
             # Current minibatch stats
             self.mb_top1_err.add_value(top1_err)
-            self.mb_top5_err.add_value(top5_err)
+            # self.mb_top5_err.add_value(top5_err)
             # Aggregate stats
             self.num_top1_mis += top1_err * mb_size
-            self.num_top5_mis += top5_err * mb_size
+            # self.num_top5_mis += top5_err * mb_size
 
     def log_iter_stats(self, cur_epoch, cur_iter):
         """
@@ -523,7 +523,7 @@ class TrainMeter(object):
         }
         if not self._cfg.DATA.MULTI_LABEL:
             stats["top1_err"] = self.mb_top1_err.get_win_median()
-            stats["top5_err"] = self.mb_top5_err.get_win_median()
+            # stats["top5_err"] = self.mb_top5_err.get_win_median()
         logging.log_json_stats(stats)
 
     def log_epoch_stats(self, cur_epoch):
@@ -547,10 +547,10 @@ class TrainMeter(object):
         }
         if not self._cfg.DATA.MULTI_LABEL:
             top1_err = self.num_top1_mis / self.num_samples
-            top5_err = self.num_top5_mis / self.num_samples
+            # top5_err = self.num_top5_mis / self.num_samples
             avg_loss = self.loss_total / self.num_samples
             stats["top1_err"] = top1_err
-            stats["top5_err"] = top5_err
+            # stats["top5_err"] = top5_err
             stats["loss"] = avg_loss
         logging.log_json_stats(stats)
 
@@ -571,13 +571,13 @@ class ValMeter(object):
         self.iter_timer = Timer()
         # Current minibatch errors (smoothed over a window).
         self.mb_top1_err = ScalarMeter(cfg.LOG_PERIOD)
-        self.mb_top5_err = ScalarMeter(cfg.LOG_PERIOD)
+        # self.mb_top5_err = ScalarMeter(cfg.LOG_PERIOD)
         # Min errors (over the full val set).
         self.min_top1_err = 100.0
-        self.min_top5_err = 100.0
+        # self.min_top5_err = 100.0
         # Number of misclassified examples.
         self.num_top1_mis = 0
-        self.num_top5_mis = 0
+        # self.num_top5_mis = 0
         self.num_samples = 0
         self.all_preds = []
         self.all_labels = []
@@ -588,9 +588,9 @@ class ValMeter(object):
         """
         self.iter_timer.reset()
         self.mb_top1_err.reset()
-        self.mb_top5_err.reset()
+        # # self.mb_top5_err.reset()
         self.num_top1_mis = 0
-        self.num_top5_mis = 0
+        # self.num_top5_mis = 0
         self.num_samples = 0
         self.all_preds = []
         self.all_labels = []
@@ -607,7 +607,7 @@ class ValMeter(object):
         """
         self.iter_timer.pause()
 
-    def update_stats(self, top1_err, top5_err, mb_size):
+    def update_stats(self, top1_err, mb_size):
         """
         Update the current stats.
         Args:
@@ -616,9 +616,7 @@ class ValMeter(object):
             mb_size (int): mini batch size.
         """
         self.mb_top1_err.add_value(top1_err)
-        self.mb_top5_err.add_value(top5_err)
         self.num_top1_mis += top1_err * mb_size
-        self.num_top5_mis += top5_err * mb_size
         self.num_samples += mb_size
 
     def update_predictions(self, preds, labels):
@@ -653,7 +651,6 @@ class ValMeter(object):
         }
         if not self._cfg.DATA.MULTI_LABEL:
             stats["top1_err"] = self.mb_top1_err.get_win_median()
-            stats["top5_err"] = self.mb_top5_err.get_win_median()
         logging.log_json_stats(stats)
 
     def log_epoch_stats(self, cur_epoch):
@@ -676,14 +673,14 @@ class ValMeter(object):
             )
         else:
             top1_err = self.num_top1_mis / self.num_samples
-            top5_err = self.num_top5_mis / self.num_samples
+            # top5_err = self.num_top5_mis / self.num_samples
             self.min_top1_err = min(self.min_top1_err, top1_err)
-            self.min_top5_err = min(self.min_top5_err, top5_err)
+            # self.min_top5_err = min(self.min_top5_err, top5_err)
 
             stats["top1_err"] = top1_err
-            stats["top5_err"] = top5_err
+            # stats["top5_err"] = top5_err
             stats["min_top1_err"] = self.min_top1_err
-            stats["min_top5_err"] = self.min_top5_err
+            # stats["min_top5_err"] = self.min_top5_err
 
         logging.log_json_stats(stats)
 

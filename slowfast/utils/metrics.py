@@ -29,15 +29,22 @@ def topks_correct(preds, labels, ks):
     _top_max_k_vals, top_max_k_inds = torch.topk(
         preds, max(ks), dim=1, largest=True, sorted=True
     )
+    _top_max_k_vals = _top_max_k_vals.view(_top_max_k_vals.shape[0], -1)
+    top_max_k_inds = top_max_k_inds.view(top_max_k_inds.shape[0], -1)
     # (batch_size, max_k) -> (max_k, batch_size).
     top_max_k_inds = top_max_k_inds.t()
     # (batch_size, ) -> (max_k, batch_size).
-    rep_max_k_labels = labels.view(1, -1).expand_as(top_max_k_inds)
+
+    if len(labels.shape) == 1:
+        rep_max_k_labels = labels.view(1, -1).expand_as(top_max_k_inds)
+    else:
+        rep_max_k_labels = labels.t()
     # (i, j) = 1 if top i-th prediction for the j-th sample is correct.
     top_max_k_correct = top_max_k_inds.eq(rep_max_k_labels)
     # Compute the number of topk correct predictions for each k.
+
     topks_correct = [
-        top_max_k_correct[:k, :].view(-1).float().sum() for k in ks
+        top_max_k_correct[:,(k-1) :].reshape(-1).float().sum() for k in ks
     ]
     return topks_correct
 

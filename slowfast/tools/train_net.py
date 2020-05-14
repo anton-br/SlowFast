@@ -198,7 +198,7 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg):
                 val_meter.iter_toc()
                 # Update and log stats.
                 val_meter.update_stats(
-                    top1_err, top5_err, inputs[0].size(0) * cfg.NUM_GPUS
+                    top1_err, inputs[0].size(0) * cfg.NUM_GPUS
                 )
 
         val_meter.log_iter_stats(cur_epoch, cur_iter)

@@ -4,6 +4,9 @@
 """Wrapper to train and test a video classification model."""
 
 import torch
+import sys
+
+sys.path.append('../slowfast/')
 
 import slowfast.utils.multiprocessing as mpu
 from slowfast.utils.parser import load_config, parse_args
@@ -61,5 +64,5 @@ def main():
 
 
 if __name__ == "__main__":
-    torch.multiprocessing.set_start_method("forkserver")
+    torch.multiprocessing.set_start_method("forkserver", force=True)
     main()

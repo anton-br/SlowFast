@@ -315,6 +315,6 @@ class ResNetMaskHead(nn.Module):
        # Performs fully convlutional inference.
         if not self.training:
             x = self.act(x)
-            x = x.mean([1, 3, 4])
+            x = x.mean([3, 4])
         x = x.view(*x.shape[:2], -1)
         return x
