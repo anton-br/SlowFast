@@ -110,6 +110,7 @@ class BasicTransform(nn.Module):
         eps=1e-5,
         bn_mmt=0.1,
         norm_module=nn.BatchNorm3d,
+        type_conv='3d'
     ):
         """
         Args:
@@ -136,11 +137,13 @@ class BasicTransform(nn.Module):
         self._inplace_relu = inplace_relu
         self._eps = eps
         self._bn_mmt = bn_mmt
+
+        self._type_conv = nn.Conv3d if type_conv == '3d' else SpatioTemporalConv
         self._construct(dim_in, dim_out, stride, norm_module)
 
     def _construct(self, dim_in, dim_out, stride, norm_module):
         # Tx3x3, BN, ReLU.
-        self.a = SpatioTemporalConv(#nn.Conv3d(
+        self.a = self._type_conv(#SpatioTemporalConv(#nn.Conv3d(
             dim_in,
             dim_out,
             kernel_size=[self.temp_kernel_size, 3, 3],
@@ -153,7 +156,7 @@ class BasicTransform(nn.Module):
         )
         self.a_relu = nn.ReLU(inplace=self._inplace_relu)
         # 1x3x3, BN.
-        self.b = SpatioTemporalConv(#nn.Conv3d(
+        self.b = self._type_conv(#SpatioTemporalConv(#nn.Conv3d(
             dim_out,
             dim_out,
             kernel_size=[1, 3, 3],
@@ -197,6 +200,7 @@ class BottleneckTransform(nn.Module):
         bn_mmt=0.1,
         dilation=1,
         norm_module=nn.BatchNorm3d,
+        type_conv='3d'
     ):
         """
         Args:
@@ -226,6 +230,7 @@ class BottleneckTransform(nn.Module):
         self._eps = eps
         self._bn_mmt = bn_mmt
         self._stride_1x1 = stride_1x1
+        self._type_conv = nn.Conv3d if type_conv == '3d' else SpatioTemporalConv
         self._construct(
             dim_in,
             dim_out,
@@ -249,7 +254,7 @@ class BottleneckTransform(nn.Module):
         (str1x1, str3x3) = (stride, 1) if self._stride_1x1 else (1, stride)
 
         # Tx1x1, BN, ReLU.
-        self.a = SpatioTemporalConv(#nn.Conv3d(
+        self.a = self._type_conv(#SpatioTemporalConv(#nn.Conv3d(
             dim_in,
             dim_inner,
             kernel_size=[self.temp_kernel_size, 1, 1],
@@ -263,7 +268,7 @@ class BottleneckTransform(nn.Module):
         self.a_relu = nn.ReLU(inplace=self._inplace_relu)
 
         # 1x3x3, BN, ReLU.
-        self.b = SpatioTemporalConv(#nn.Conv3d(
+        self.b = self._type_conv(#SpatioTemporalConv(#nn.Conv3d(
             dim_inner,
             dim_inner,
             [1, 3, 3],
@@ -279,7 +284,7 @@ class BottleneckTransform(nn.Module):
         self.b_relu = nn.ReLU(inplace=self._inplace_relu)
 
         # 1x1x1, BN.
-        self.c = SpatioTemporalConv(#nn.Conv3d(
+        self.c = self._type_conv(#SpatioTemporalConv(#nn.Conv3d(
             dim_inner,
             dim_out,
             kernel_size=[1, 1, 1],
@@ -330,6 +335,7 @@ class ResBlock(nn.Module):
         bn_mmt=0.1,
         dilation=1,
         norm_module=nn.BatchNorm3d,
+        type_conv='3d'
     ):
         """
         ResBlock class constructs redisual blocks. More details can be found in:
@@ -363,6 +369,7 @@ class ResBlock(nn.Module):
         self._inplace_relu = inplace_relu
         self._eps = eps
         self._bn_mmt = bn_mmt
+        self._type_conv = nn.Conv3d if type_conv == '3d' else SpatioTemporalConv
         self._construct(
             dim_in,
             dim_out,
@@ -393,7 +400,7 @@ class ResBlock(nn.Module):
     ):
         # Use skip connection with projection if dim or res change.
         if (dim_in != dim_out) or (stride != 1):
-            self.branch1 = SpatioTemporalConv(#nn.Conv3d(
+            self.branch1 = self._type_conv(#SpatioTemporalConv(#nn.Conv3d(
                 dim_in,
                 dim_out,
                 kernel_size=1,
@@ -458,6 +465,7 @@ class ResStage(nn.Module):
         stride_1x1=False,
         inplace_relu=True,
         norm_module=nn.BatchNorm3d,
+        type_conv='3d'
     ):
         """
         The `__init__` method of any subclass should also contain these arguments.
@@ -548,6 +556,7 @@ class ResStage(nn.Module):
             instantiation,
             dilation,
             norm_module,
+            type_conv,
         )
 
     def _construct(
@@ -565,6 +574,7 @@ class ResStage(nn.Module):
         instantiation,
         dilation,
         norm_module,
+        type_conv
     ):
         for pathway in range(self.num_pathways):
             for i in range(self.num_blocks[pathway]):
@@ -583,6 +593,7 @@ class ResStage(nn.Module):
                     inplace_relu=inplace_relu,
                     dilation=dilation[pathway],
                     norm_module=norm_module,
+                    type_conv=type_conv,
                 )
                 self.add_module("pathway{}_res{}".format(pathway, i), res_block)
                 if i in nonlocal_inds[pathway]:

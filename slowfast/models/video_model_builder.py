@@ -223,6 +223,7 @@ class SlowFast(nn.Module):
             trans_func_name=cfg.RESNET.TRANS_FUNC,
             dilation=cfg.RESNET.SPATIAL_DILATIONS[0],
             norm_module=self.norm_module,
+            type_conv=cfg.RESNET.TYPE_CONV,
         )
         self.s2_fuse = FuseFastToSlow(
             width_per_group * 4 // cfg.SLOWFAST.BETA_INV,
@@ -262,6 +263,7 @@ class SlowFast(nn.Module):
             trans_func_name=cfg.RESNET.TRANS_FUNC,
             dilation=cfg.RESNET.SPATIAL_DILATIONS[1],
             norm_module=self.norm_module,
+            type_conv=cfg.RESNET.TYPE_CONV,
         )
         self.s3_fuse = FuseFastToSlow(
             width_per_group * 8 // cfg.SLOWFAST.BETA_INV,
@@ -293,6 +295,7 @@ class SlowFast(nn.Module):
             trans_func_name=cfg.RESNET.TRANS_FUNC,
             dilation=cfg.RESNET.SPATIAL_DILATIONS[2],
             norm_module=self.norm_module,
+            type_conv=cfg.RESNET.TYPE_CONV,
         )
         self.s4_fuse = FuseFastToSlow(
             width_per_group * 16 // cfg.SLOWFAST.BETA_INV,
@@ -324,6 +327,7 @@ class SlowFast(nn.Module):
             trans_func_name=cfg.RESNET.TRANS_FUNC,
             dilation=cfg.RESNET.SPATIAL_DILATIONS[3],
             norm_module=self.norm_module,
+            type_conv=cfg.RESNET.TYPE_CONV,
         )
 
         if cfg.DETECTION.ENABLE:
