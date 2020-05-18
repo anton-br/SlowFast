@@ -63,7 +63,8 @@ class Ava(torch.utils.data.Dataset):
         (
             self._keyframe_indices,
             self._keyframe_boxes_and_labels,
-        ) = ava_helper.get_keyframe_data(self.labels, self._labels_type, self._seq_len)
+        ) = ava_helper.get_keyframe_data(self.labels, self._labels_type, self._seq_len,
+                                         self._video_length, self._num_classes)
 
         # Calculate the number of used boxes.
         self.print_summary()
@@ -333,7 +334,6 @@ class Ava(torch.utils.data.Dataset):
         video_idx, labels, start_idx, end_idx = self._keyframe_indices[idx]
         # Load images of current clip.
         image_paths = [self._image_paths[video_idx][frame] for frame in range(start_idx, end_idx)]
-
         imgs = utils.retry_load_images(
             image_paths, backend=self.cfg.AVA.IMG_PROC_BACKEND
         )

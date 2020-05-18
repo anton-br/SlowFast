@@ -155,7 +155,7 @@ def load_boxes_and_labels(cfg, mode):
     return all_boxes
 
 
-def get_keyframe_data(boxes_and_labels, type_labels, seq_len):
+def get_keyframe_data(boxes_and_labels, type_labels, seq_len, num_frames, num_classes):
     """
     Getting keyframe indices, boxes and labels in the dataset.
 
@@ -190,23 +190,8 @@ def get_keyframe_data(boxes_and_labels, type_labels, seq_len):
                         label
                     )
                 elif type_labels == 'mask':
-                    if seq_len <= (sec - ix_st):
-                        left_ix = ix_st
-                        right_ix = ix_st + seq_len
-                    else:
-                        max_off = seq_len - (sec - ix_st)
-                        offset = np.random.randint(0, max_off)
-                        if offset > ix_st:
-                            left_ix = 0
-                            right_ix = seq_len
-                        elif sec + (max_off - offset) > len(boxes_and_labels[video_idx]):
-                            right_ix = len(boxes_and_labels[video_idx])
-                            left_ix = right_ix - seq_len
-                            if left_ix < 0:
-                                raise ValueError(f'Given video is too short. Video idx: {video_idx}')
-                        else:
-                            left_ix = ix_st - offset
-                            right_ix = sec + (max_off - offset)
+                    left_ix, right_ix = move_window_given(sec, ix_st, len(boxes_and_labels[video_idx]),
+                                                          seq_len, video_idx)
 
                     labels = np.array(boxes_and_labels[video_idx][left_ix: right_ix])
                     keyframe_indices.append(
@@ -215,10 +200,50 @@ def get_keyframe_data(boxes_and_labels, type_labels, seq_len):
                     keyframe_boxes_and_labels[video_idx].append(
                         labels
                     )
+                elif type_labels == 'regression':
+                    left_ix, right_ix = move_window_given(sec, ix_st, len(boxes_and_labels[video_idx]),
+                                                          seq_len, video_idx)
+                    labels = np.array(boxes_and_labels[video_idx][left_ix: right_ix])
+                    lbs_ixs = np.where(np.diff(labels) != 0)[0] + 1
+                    labels_length = num_classes*2 + 1
+                    if len(lbs_ixs) == 0:
+                        lbs_regress = np.array([1, num_frames, *[0]*(num_classes-1), labels[0], *[0]*(num_classes-1)])
+                    else:
+                        num_add = num_classes - len(lbs_ixs) - 1
+                        if num_add < 0:
+                            raise ValueError(f'No more then {num_classes} actions should be added in one element.')
+                        lbs_val = np.array([labels[0], *labels[lbs_ixs], *[0]*num_add])
+                        lbs_length = np.array([lbs_ixs[0], *np.diff(np.array([*lbs_ixs, num_frames])), *[0]*num_add])
+                        lbs_regress = np.array([num_classes-num_add, *lbs_length, *lbs_val])
+                    keyframe_indices.append(
+                        (video_idx, lbs_regress, left_ix, right_ix)
+                    )
+                    keyframe_boxes_and_labels[video_idx].append(
+                        lbs_regress
+                    )
                 ix_st = -1
 
     return keyframe_indices, keyframe_boxes_and_labels
 
+def move_window_given(sec, ix_st, len_b_and_l, seq_len, idx):
+    if seq_len <= (sec - ix_st):
+        left_ix = ix_st
+        right_ix = ix_st + seq_len
+    else:
+        max_off = seq_len - (sec - ix_st)
+        offset = np.random.randint(0, max_off)
+        if offset > ix_st:
+            left_ix = 0
+            right_ix = seq_len
+        elif sec + (max_off - offset) > len_b_and_l:
+            right_ix = len_b_and_l
+            left_ix = right_ix - seq_len
+            if left_ix < 0:
+                raise ValueError(f'Given video is too short. Video idx: {idx}')
+        else:
+            left_ix = ix_st - offset
+            right_ix = sec + (max_off - offset)
+    return left_ix, right_ix
 
 def get_num_boxes_used(keyframe_indices, keyframe_boxes_and_labels):
     """

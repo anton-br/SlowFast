@@ -397,6 +397,28 @@ class SlowFast(nn.Module):
                 dropout_rate=cfg.MODEL.DROPOUT_RATE,
                 act_func=cfg.MODEL.HEAD_ACT,
             )
+        elif cfg.DATA.LABELS_TYPE == 'regression':
+            self.head = head_helper.ResNetRegressionHead(
+                dim_in=[
+                    width_per_group * 32,
+                    width_per_group * 32 // cfg.SLOWFAST.BETA_INV,
+                ],
+                num_classes=cfg.MODEL.NUM_CLASSES,
+                pool_size=[
+                    [
+                        cfg.DATA.NUM_FRAMES // cfg.SLOWFAST.ALPHA // pool_size[0][0],
+                        cfg.DATA.CROP_SIZE // 16 // pool_size[0][1],
+                        cfg.DATA.CROP_SIZE // 16 // pool_size[0][2],
+                    ],
+                    [
+                        cfg.DATA.NUM_FRAMES // pool_size[1][0],
+                        cfg.DATA.CROP_SIZE // 16 // pool_size[1][1],
+                        cfg.DATA.CROP_SIZE // 16 // pool_size[1][2],
+                    ],
+                ],
+                dropout_rate=cfg.MODEL.DROPOUT_RATE,
+                act_func=cfg.MODEL.HEAD_ACT,
+            )
         else:
             raise ValueError('Wrong labels type')
 
