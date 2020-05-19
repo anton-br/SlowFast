@@ -27,6 +27,7 @@ class Ava(torch.utils.data.Dataset):
         self._video_length = cfg.DATA.NUM_FRAMES
         self._seq_len = self._video_length * self._sample_rate
         self._num_classes = cfg.MODEL.NUM_CLASSES
+        self._output_size = cfg.MODEL.OUTPUT_SIZE
         self._labels_type = cfg.DATA.LABELS_TYPE
         # Augmentation params.
         self._data_mean = cfg.DATA.MEAN
@@ -64,7 +65,7 @@ class Ava(torch.utils.data.Dataset):
             self._keyframe_indices,
             self._keyframe_boxes_and_labels,
         ) = ava_helper.get_keyframe_data(self.labels, self._labels_type, self._seq_len,
-                                         self._video_length, self._num_classes)
+                                         self._video_length, self._output_size)
 
         # Calculate the number of used boxes.
         self.print_summary()

@@ -11,7 +11,6 @@ from . import custom_config
 # -----------------------------------------------------------------------------
 _C = CfgNode()
 
-
 # ---------------------------------------------------------------------------- #
 # Batch norm options
 # ---------------------------------------------------------------------------- #
@@ -110,6 +109,9 @@ _C.TEST.CHECKPOINT_TYPE = "pytorch"
 # -----------------------------------------------------------------------------
 _C.RESNET = CfgNode()
 
+#type of convolutions ('3d' or 'sp')
+_C.RESNET.TYPE_CONV = 'sp'
+
 # Transformation function.
 _C.RESNET.TRANS_FUNC = "bottleneck_transform"
 
@@ -201,6 +203,7 @@ _C.MODEL.FC_INIT_STD = 0.01
 # Activation layer for the output head.
 _C.MODEL.HEAD_ACT = "softmax"
 
+_C.MODEL.OUTPUT_SIZE = 5
 
 # -----------------------------------------------------------------------------
 # SlowFast options

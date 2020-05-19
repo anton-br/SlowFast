@@ -76,6 +76,7 @@ class VideoModelStem(nn.Module):
 
     def _construct_stem(self, dim_in, dim_out, norm_module):
         for pathway in range(len(dim_in)):
+
             stem = ResNetBasicStem(
                 dim_in[pathway],
                 dim_out[pathway],

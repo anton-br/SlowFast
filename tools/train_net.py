@@ -39,7 +39,9 @@ def train_epoch(train_loader, model, optimizer, train_meter, cur_epoch, cfg):
     model.train()
     train_meter.iter_tic()
     data_size = len(train_loader)
-
+    regr_list = []
+    num_list = []
+    top_list = []
     for cur_iter, (inputs, labels, _) in enumerate(train_loader):
         # Transfer the data to the current GPU device.
         if isinstance(inputs, (list,)):
@@ -49,19 +51,20 @@ def train_epoch(train_loader, model, optimizer, train_meter, cur_epoch, cfg):
             inputs = inputs.cuda(non_blocking=True)
         labels = labels.cuda(non_blocking=True)
 
+        if cfg.MODEL.LOSS_FUNC == 'mse':
+            labels = labels.float()
+
         lr = optim.get_epoch_lr(cur_epoch + float(cur_iter) / data_size, cfg)
         optim.set_lr(optimizer, lr)
 
 
         # Perform the forward pass.
         preds = model(inputs)
-
         # Explicitly declare reduction to mean.
         loss_fun = losses.get_loss_func(cfg.MODEL.LOSS_FUNC)(reduction="mean")
-
         # Compute the loss.
-        loss = loss_fun(preds, labels)
 
+        loss = loss_fun(preds, labels)
         # check Nan Loss.
         misc.check_nan_losses(loss)
 
@@ -73,9 +76,32 @@ def train_epoch(train_loader, model, optimizer, train_meter, cur_epoch, cfg):
 
         top1_err = None
         # Compute the errors.
-        num_topks_correct = metrics.topks_correct(preds, labels, (1, ))
-        preds_ix = 2 if cfg.DATA.LABELS_TYPE == 'mask' else 1
-        top1_err = (1.0 - num_topks_correct[0] / preds.size(preds_ix)) * 100.0
+        num_classes = cfg.MODEL.NUM_CLASSES
+        if cfg.DATA.LABELS_TYPE == 'regression':
+            ln = (labels.size(1) - 1) // 2 + 1
+            pr = preds[:,ln:].reshape(-1, 5)
+            lb = labels[:,ln:].reshape(-1)
+            num_topks_correct = metrics.topks_correct(pr, lb, (1, ))
+            top1_err = (1.0 - num_topks_correct[0] / len(lb)) * 100.0
+            regr = ((preds[:, 0] - labels[:, 0])**2).mean()
+            numbers =  ((preds[:, 1: ln] - labels[:, 1: ln])**2).mean()
+            if cfg.NUM_GPUS > 1:
+                regr, numbers = du.all_reduce([regr, numbers])
+            regr_list.append(regr.item())
+            num_list.append(numbers.item())
+        elif cfg.DATA.LABELS_TYPE == 'length':
+            regr = ((preds[:, 0] - labels[:, 0])**2).mean()
+            numbers =  ((preds[:, 1: num_classes+1] - labels[:, 1: num_classes+1])**2).mean()
+            if cfg.NUM_GPUS > 1:
+                regr, numbers = du.all_reduce([regr, numbers])
+            regr_list.append(regr.item())
+            num_list.append(numbers.item())
+            num_topks_correct = metrics.topks_correct(preds, labels, (1, ))
+            top1_err = num_topks_correct[0] * 0.0
+        else:
+            num_topks_correct = metrics.topks_correct(preds, labels, (1, ))
+            preds_ix = preds.size(2)*preds.size(0) if cfg.DATA.LABELS_TYPE == 'mask' else preds.size(1)
+            top1_err = (1.0 - num_topks_correct[0] / preds_size) * 100.0
 
         # Gather all the predictions across all the devices.
         if cfg.NUM_GPUS > 1:
@@ -88,7 +114,7 @@ def train_epoch(train_loader, model, optimizer, train_meter, cur_epoch, cfg):
             loss.item(),
             top1_err.item()
         )
-
+        top_list.append(top1_err)
         train_meter.iter_toc()
         # Update and log stats.
         train_meter.update_stats(
@@ -97,7 +123,10 @@ def train_epoch(train_loader, model, optimizer, train_meter, cur_epoch, cfg):
 
         train_meter.log_iter_stats(cur_epoch, cur_iter)
         train_meter.iter_tic()
-
+    if cfg.DATA.LABELS_TYPE == 'regression' or cfg.DATA.LABELS_TYPE == 'length':
+        print('---------------------')
+        print(f'LOSS VALUES!!: SIZE_LOSS:{np.mean(regr_list)} NUM_LOSS:{np.mean(num_list)} CLASS_LOSS:{np.mean(top_list)}')
+        print('---------------------')
     # Log epoch stats.
     train_meter.log_epoch_stats(cur_epoch)
     train_meter.reset()
@@ -119,7 +148,9 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg):
     # Evaluation mode enabled. The running stats would not be updated.
     model.eval()
     val_meter.iter_tic()
-
+    regr_list = []
+    num_list = []
+    top_list = []
     for cur_iter, (inputs, labels, _) in enumerate(val_loader):
         # Transfer the data to the current GPU device.
         if isinstance(inputs, (list,)):
@@ -131,17 +162,42 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg):
 
 
         preds = model(inputs)
-        num_topks_correct = metrics.topks_correct(preds, labels, (1, ))
-        # Combine the errors across the GPUs.
-        preds_ix = 2 if cfg.DATA.LABELS_TYPE == 'mask' else 1
-        top1_err = (1.0 - num_topks_correct[0] / preds.size(preds_ix)) * 100.0
+        if cfg.DATA.LABELS_TYPE == 'regression':
+            ln = (labels.size(1) - 1) // 2 + 1
+            pr = preds[:,ln:].reshape(-1, 5)
+            lb = labels[:,ln:].reshape(-1)
+            num_topks_correct = metrics.topks_correct(pr, lb, (1, ))
+            top1_err = (1.0 - num_topks_correct[0] / len(lb)) * 100.0
+            regr = ((preds[:, 0] - labels[:, 0])**2).mean()
+            numbers =  ((preds[:, 1: ln] - labels[:, 1: ln])**2).mean()
+            if cfg.NUM_GPUS > 1:
+                regr, numbers = du.all_reduce([regr, numbers])
+            regr_list.append(regr.item())
+            num_list.append(numbers.item())
+        elif cfg.DATA.LABELS_TYPE == 'length':
+            regr = ((preds[:, 0] - labels[:, 0])**2).mean()
+            numbers =  ((preds[:, 1: num_classes+1] - labels[:, 1: num_classes+1])**2).mean()
+            if cfg.NUM_GPUS > 1:
+                regr, numbers = du.all_reduce([regr, numbers])
+            regr_list.append(regr.item())
+            num_list.append(numbers.item())
+            num_topks_correct = metrics.topks_correct(preds, labels, (1, ))
+            top1_err = num_topks_correct[0] * 0.0
+        else:
+            num_topks_correct = metrics.topks_correct(preds, labels, (1, ))
+            preds_ix = preds.size(2)*preds.size(0) if cfg.DATA.LABELS_TYPE == 'mask' else preds.size(1)
+            top1_err = (1.0 - num_topks_correct[0] / preds_size) * 100.0
+
+        # num_topks_correct = metrics.topks_correct(preds, labels, (1, ))
+        # # Combine the errors across the GPUs.
+        # preds_ix = 2 if cfg.DATA.LABELS_TYPE == 'mask' else 1
+        # top1_err = (1.0 - num_topks_correct[0] / preds.size(preds_ix)) * 100.0
 
         if cfg.NUM_GPUS > 1:
-            top1_err = du.all_reduce([top1_err])
-
+            top1_err = du.all_reduce([top1_err])[0]
         # Copy the errors from GPU to CPU (sync point).
         top1_err = top1_err.item()
-
+        top_list.append(top1_err)
         val_meter.iter_toc()
         # Update and log stats.
         val_meter.update_stats(
@@ -150,7 +206,10 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg):
 
         val_meter.log_iter_stats(cur_epoch, cur_iter)
         val_meter.iter_tic()
-
+    if cfg.DATA.LABELS_TYPE == 'regression' or cfg.DATA.LABELS_TYPE == 'length':
+        print('---------------------')
+        print(f'VALIDATE LOSS!!: SIZE_LOSS:{np.mean(regr_list):.5} NUM_LOSS:{np.mean(num_list):.5} CLASS_LOSS:{np.mean(top_list):.5}')
+        print('---------------------')
     # Log epoch stats.
     val_meter.log_epoch_stats(cur_epoch)
     val_meter.reset()
