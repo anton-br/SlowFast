@@ -155,7 +155,7 @@ def load_boxes_and_labels(cfg, mode):
     return all_boxes
 
 
-def get_keyframe_data(boxes_and_labels, type_labels, seq_len, num_frames, output_size):
+def get_keyframe_data(boxes_and_labels, type_labels, seq_len, num_frames, output_size, predict_all):
     """
     Getting keyframe indices, boxes and labels in the dataset.
 
@@ -176,70 +176,120 @@ def get_keyframe_data(boxes_and_labels, type_labels, seq_len, num_frames, output
         keyframe_boxes_and_labels.append([])
         current_label = boxes_and_labels[video_idx][0]
         ix_st = 0
-        for sec, label in enumerate(boxes_and_labels[video_idx]):
-            if ix_st == -1:
-                ix_st = sec
-                current_label = label
+        if not predict_all:
+            for sec, label in enumerate(boxes_and_labels[video_idx]):
+                    if ix_st == -1:
+                        ix_st = sec
+                        current_label = label
 
-            if label != current_label:
-                if type_labels == 'class':
-                    keyframe_indices.append(
-                        (video_idx, current_label, ix_st, sec)
-                    )
-                    keyframe_boxes_and_labels[video_idx].append(
-                        label
-                    )
-                elif type_labels == 'mask':
-                    left_ix, right_ix = move_window_given(sec, ix_st, len(boxes_and_labels[video_idx]),
-                                                          seq_len, video_idx)
+                    if label != current_label:
+                        if type_labels == 'class':
+                            keyframe_indices.append(
+                                (video_idx, current_label, ix_st, sec)
+                            )
+                            keyframe_boxes_and_labels[video_idx].append(
+                                label
+                            )
+                        elif type_labels == 'mask':
+                            left_ix, right_ix = move_window_given(sec, ix_st, len(boxes_and_labels[video_idx]),
+                                                                seq_len, video_idx)
 
-                    labels = np.array(boxes_and_labels[video_idx][left_ix: right_ix])
-                    keyframe_indices.append(
-                        (video_idx, labels, left_ix, right_ix)
-                    )
-                    keyframe_boxes_and_labels[video_idx].append(
-                        labels
-                    )
-                elif type_labels == 'regression':
-                    left_ix, right_ix = move_window_given(sec, ix_st, len(boxes_and_labels[video_idx]),
-                                                          seq_len, video_idx)
-                    labels = np.array(boxes_and_labels[video_idx][left_ix: right_ix])
-                    lbs_ixs = np.where(np.diff(labels) != 0)[0] + 1
-                    if len(lbs_ixs) == 0:
-                        lbs_regress = np.array([1, num_frames, *[0]*(output_size-1), labels[0], *[0]*(output_size-1)])
-                    else:
-                        num_add = output_size - len(lbs_ixs) - 1
-                        if num_add < 0:
-                            raise ValueError(f'No more then {output_size} actions should be added in one element.')
-                        lbs_val = np.array([labels[0], *labels[lbs_ixs], *[0]*num_add])
-                        lbs_length = np.array([lbs_ixs[0], *np.diff(np.array([*lbs_ixs, num_frames])), *[0]*num_add])
-                        lbs_regress = np.array([output_size-num_add, *lbs_length, *lbs_val])
-                    keyframe_indices.append(
-                        (video_idx, lbs_regress, left_ix, right_ix)
-                    )
-                    keyframe_boxes_and_labels[video_idx].append(
-                        lbs_regress
-                    )
-                elif type_labels == 'length':
-                    left_ix, right_ix = move_window_given(sec, ix_st, len(boxes_and_labels[video_idx]),
-                                                          seq_len, video_idx)
-                    labels = np.array(boxes_and_labels[video_idx][left_ix: right_ix])
-                    lbs_ixs = np.where(np.diff(labels) != 0)[0] + 1
-                    if len(lbs_ixs) == 0:
-                        lbs_length = np.array([1, num_frames, *[0]*(output_size-1)])
-                    else:
-                        num_add = output_size - len(lbs_ixs) - 1
-                        if num_add < 0:
-                            raise ValueError(f'No more then {output_size} actions should be added in one element.')
-                        lbs_length = np.array([output_size-num_add, lbs_ixs[0],
-                                               *np.diff(np.array([*lbs_ixs, num_frames])), *[0]*num_add])
-                    keyframe_indices.append(
-                        (video_idx, lbs_length, left_ix, right_ix)
-                    )
-                    keyframe_boxes_and_labels[video_idx].append(
-                        lbs_length
-                    )
-                ix_st = -1
+                            labels = np.array(boxes_and_labels[video_idx][left_ix: right_ix])
+                            keyframe_indices.append(
+                                (video_idx, labels, left_ix, right_ix)
+                            )
+                            keyframe_boxes_and_labels[video_idx].append(
+                                labels
+                            )
+                        elif type_labels == 'regression':
+                            left_ix, right_ix = move_window_given(sec, ix_st, len(boxes_and_labels[video_idx]),
+                                                                seq_len, video_idx)
+                            labels = np.array(boxes_and_labels[video_idx][left_ix: right_ix])
+                            lbs_ixs = np.where(np.diff(labels) != 0)[0] + 1
+                            if len(lbs_ixs) == 0:
+                                lbs_regress = np.array([1, num_frames, *[0]*(output_size-1), labels[0], *[0]*(output_size-1)])
+                            else:
+                                num_add = output_size - len(lbs_ixs) - 1
+                                if num_add < 0:
+                                    raise ValueError(f'No more then {output_size} actions should be added in one element.')
+                                lbs_val = np.array([labels[0], *labels[lbs_ixs], *[0]*num_add])
+                                lbs_length = np.array([lbs_ixs[0], *np.diff(np.array([*lbs_ixs, num_frames])), *[0]*num_add])
+                                lbs_regress = np.array([output_size-num_add, *lbs_length, *lbs_val])
+                            keyframe_indices.append(
+                                (video_idx, lbs_regress, left_ix, right_ix)
+                            )
+                            keyframe_boxes_and_labels[video_idx].append(
+                                lbs_regress
+                            )
+                        elif type_labels == 'length':
+                            left_ix, right_ix = move_window_given(sec, ix_st, len(boxes_and_labels[video_idx]),
+                                                                seq_len, video_idx)
+                            labels = np.array(boxes_and_labels[video_idx][left_ix: right_ix])
+                            lbs_ixs = np.where(np.diff(labels) != 0)[0] + 1
+                            if len(lbs_ixs) == 0:
+                                lbs_length = np.array([1, num_frames, *[0]*(output_size-1)])
+                            else:
+                                num_add = output_size - len(lbs_ixs) - 1
+                                if num_add < 0:
+                                    raise ValueError(f'No more then {output_size} actions should be added in one element.')
+                                lbs_length = np.array([output_size-num_add, lbs_ixs[0],
+                                                    *np.diff(np.array([*lbs_ixs, num_frames])), *[0]*num_add])
+                            keyframe_indices.append(
+                                (video_idx, lbs_length, left_ix, right_ix)
+                            )
+                            keyframe_boxes_and_labels[video_idx].append(
+                                lbs_length
+                            )
+                        elif type_labels == 'stend':
+                            left_ix, right_ix = move_window_given(sec, ix_st, len(boxes_and_labels[video_idx]),
+                                                                  seq_len, video_idx)
+                            labels = np.array(boxes_and_labels[video_idx][left_ix: right_ix])
+                            ix_stend = np.where(np.diff(labels) != 0)[0]
+
+                            start_ix = np.zeros_like(labels, dtype=np.float32)
+                            end_ix = np.zeros_like(labels, dtype=np.float32)
+
+                            start_ix[[*np.clip(ix_stend+1, 0, len(labels)-1),
+                                      *np.clip(ix_stend+2, 0, len(labels)-1),
+                                      *np.clip(ix_stend+3, 0, len(labels)-1)]] = 1
+                            end_ix[[*np.clip(ix_stend, 0, len(labels)-1),
+                                    *np.clip(ix_stend-1, 0, len(labels)-1),
+                                    *np.clip(ix_stend-2, 0, len(labels)-1)]] = 1
+
+
+                            keyframe_indices.append(
+                                (video_idx, [start_ix, end_ix], left_ix, right_ix)
+                            )
+                            keyframe_boxes_and_labels[video_idx].append(
+                                [start_ix, end_ix]
+                            )
+                        ix_st = -1
+        else:
+            iterator = np.arange(0, len(boxes_and_labels[video_idx]),  num_frames)
+            rest = len(boxes_and_labels[video_idx]) % num_frames
+
+            cropped_labels = boxes_and_labels[video_idx][:-rest] if rest != 0 else boxes_and_labels[video_idx]
+            cropped_labels = np.array(cropped_labels).reshape(-1, num_frames)
+            for ix, iterat in enumerate(iterator[:-1]):
+                keyframe_indices.append(
+                    (video_idx, cropped_labels[ix], iterat, iterator[ix+1])
+                )
+                keyframe_boxes_and_labels[video_idx].append(
+                                cropped_labels[ix]
+                            )
+            # for sec, label in enumerate():
+            #         if ix_st == -1:
+            #             ix_st = sec
+            #             current_label = label
+
+            #         if label != current_label:
+            #             if type_labels == 'class':
+            #                 keyframe_indices.append(
+            #                     (video_idx, current_label, ix_st, sec)
+            #                 )
+            #                 keyframe_boxes_and_labels[video_idx].append(
+            #                     label
+            #                 )
 
     return keyframe_indices, keyframe_boxes_and_labels
 

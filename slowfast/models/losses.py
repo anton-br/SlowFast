@@ -28,12 +28,32 @@ class RegressionLoss(_Loss):
         resulted_loss = vlen_loss + 10 * vcl_loss
         return resulted_loss
 
+class StendLoss(_Loss):
+    def __init__(self, size_average=None, reduce=None, reduction='mean'):
+        super(StendLoss, self).__init__()
+        self.reduction = reduction
+
+    def forward(self, output, target):
+        start_pred = output[:,0]
+        end_pred = output[:,1]
+
+        start_target = target[0]
+        end_target = target[1]
+
+        start_loss = nn.BCEWithLogitsLoss(reduction=self.reduction)
+        end_loss = nn.BCEWithLogitsLoss(reduction=self.reduction)
+
+        start_comp = start_loss(start_pred, start_target)
+        end_comp = end_loss(end_pred, end_target)
+        return start_comp + end_comp
+
 _LOSSES = {
     "cross_entropy": nn.CrossEntropyLoss,
     "bce": nn.BCELoss,
     "bce_logit": nn.BCEWithLogitsLoss,
     "regression": RegressionLoss,
     'mse': nn.MSELoss,
+    'stend': StendLoss,
 }
 
 def get_loss_func(loss_name):

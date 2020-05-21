@@ -49,7 +49,13 @@ def train_epoch(train_loader, model, optimizer, train_meter, cur_epoch, cfg):
                 inputs[i] = inputs[i].cuda(non_blocking=True)
         else:
             inputs = inputs.cuda(non_blocking=True)
-        labels = labels.cuda(non_blocking=True)
+
+        if isinstance(labels, (list,)):
+            for i in range(len(labels)):
+                labels[i] = labels[i].cuda(non_blocking=True)
+            labels = torch.stack((labels))
+        else:
+            labels = labels.cuda(non_blocking=True)
 
         if cfg.MODEL.LOSS_FUNC == 'mse':
             labels = labels.float()
@@ -91,13 +97,19 @@ def train_epoch(train_loader, model, optimizer, train_meter, cur_epoch, cfg):
             num_list.append(numbers.item())
         elif cfg.DATA.LABELS_TYPE == 'length':
             regr = ((preds[:, 0] - labels[:, 0])**2).mean()
-            numbers =  ((preds[:, 1: num_classes+1] - labels[:, 1: num_classes+1])**2).mean()
+            numbers = ((preds[:, 1: ] - labels[:, 1: ])**2).mean()
             if cfg.NUM_GPUS > 1:
                 regr, numbers = du.all_reduce([regr, numbers])
             regr_list.append(regr.item())
             num_list.append(numbers.item())
             num_topks_correct = metrics.topks_correct(preds, labels, (1, ))
             top1_err = num_topks_correct[0] * 0.0
+        elif cfg.DATA.LABELS_TYPE == 'stend':
+            top1_err = loss.clone()
+            # sigm = torch.nn.Sigmoid()
+            # start = sigm(preds[:, 0]).cpu().detach().numpy()
+            # end = sigm(preds[:, 1]).cpu().detach().numpy()
+
         else:
             num_topks_correct = metrics.topks_correct(preds, labels, (1, ))
             preds_ix = preds.size(2)*preds.size(0) if cfg.DATA.LABELS_TYPE == 'mask' else preds.size(1)
@@ -158,12 +170,18 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg):
                 inputs[i] = inputs[i].cuda(non_blocking=True)
         else:
             inputs = inputs.cuda(non_blocking=True)
-        labels = labels.cuda(non_blocking=True)
+
+        if isinstance(labels, (list,)):
+            for i in range(len(labels)):
+                labels[i] = labels[i].cuda(non_blocking=True)
+            labels = torch.stack((labels))
+        else:
+            labels = labels.cuda(non_blocking=True)
 
 
         preds = model(inputs)
+
         if cfg.DATA.LABELS_TYPE == 'regression':
-            ln = (labels.size(1) - 1) // 2 + 1
             pr = preds[:,ln:].reshape(-1, 5)
             lb = labels[:,ln:].reshape(-1)
             num_topks_correct = metrics.topks_correct(pr, lb, (1, ))
@@ -176,13 +194,17 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg):
             num_list.append(numbers.item())
         elif cfg.DATA.LABELS_TYPE == 'length':
             regr = ((preds[:, 0] - labels[:, 0])**2).mean()
-            numbers =  ((preds[:, 1: num_classes+1] - labels[:, 1: num_classes+1])**2).mean()
+            numbers =  ((preds[:, 1: ] - labels[:, 1: ])**2).mean()
             if cfg.NUM_GPUS > 1:
                 regr, numbers = du.all_reduce([regr, numbers])
             regr_list.append(regr.item())
             num_list.append(numbers.item())
             num_topks_correct = metrics.topks_correct(preds, labels, (1, ))
             top1_err = num_topks_correct[0] * 0.0
+        elif cfg.DATA.LABELS_TYPE == 'stend':
+            loss_fun = losses.get_loss_func(cfg.MODEL.LOSS_FUNC)(reduction="mean")
+            loss = loss_fun(preds, labels)
+            top1_err = loss.clone()
         else:
             num_topks_correct = metrics.topks_correct(preds, labels, (1, ))
             preds_ix = preds.size(2)*preds.size(0) if cfg.DATA.LABELS_TYPE == 'mask' else preds.size(1)

@@ -29,6 +29,7 @@ class Ava(torch.utils.data.Dataset):
         self._num_classes = cfg.MODEL.NUM_CLASSES
         self._output_size = cfg.MODEL.OUTPUT_SIZE
         self._labels_type = cfg.DATA.LABELS_TYPE
+        self._predict_all = cfg.PREDICT_ALL
         # Augmentation params.
         self._data_mean = cfg.DATA.MEAN
         self._data_std = cfg.DATA.STD
@@ -59,13 +60,12 @@ class Ava(torch.utils.data.Dataset):
         self._image_paths, self._video_idx_to_name, self.labels = ava_helper.load_image_lists(
             cfg, is_train=(self._split == "train")
         )
-
         # Get indices of keyframes and corresponding boxes and labels.
         (
             self._keyframe_indices,
             self._keyframe_boxes_and_labels,
         ) = ava_helper.get_keyframe_data(self.labels, self._labels_type, self._seq_len,
-                                         self._video_length, self._output_size)
+                                         self._video_length, self._output_size, self._predict_all)
 
         # Calculate the number of used boxes.
         self.print_summary()
@@ -339,7 +339,7 @@ class Ava(torch.utils.data.Dataset):
             image_paths, backend=self.cfg.AVA.IMG_PROC_BACKEND
         )
 
-        if self._labels_type == 'class':
+        if self._labels_type == 'class' and not self._predict_all:
             imgs = imgs[:30]
             imgs_len = len(imgs)
             if imgs_len < 30:
@@ -366,4 +366,4 @@ class Ava(torch.utils.data.Dataset):
                 imgs, boxes=None
             )
         imgs = utils.pack_pathway_output(self.cfg, imgs)
-        return imgs, labels, idx
+        return imgs, labels, [video_idx, start_idx]
