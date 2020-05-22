@@ -11,6 +11,7 @@ from . import custom_config
 # -----------------------------------------------------------------------------
 _C = CfgNode()
 
+_C.PREDICT_ALL = False
 # ---------------------------------------------------------------------------- #
 # Batch norm options
 # ---------------------------------------------------------------------------- #
@@ -47,6 +48,8 @@ _C.BN.NUM_SYNC_DEVICES = 1
 # Training options.
 # ---------------------------------------------------------------------------- #
 _C.TRAIN = CfgNode()
+
+_C.TRAIN.SHUFFLE = True
 
 # If True Train the model, else skip training.
 _C.TRAIN.ENABLE = True
