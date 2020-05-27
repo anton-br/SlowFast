@@ -240,7 +240,7 @@ def get_keyframe_data(boxes_and_labels, type_labels, seq_len, num_frames, output
                             keyframe_boxes_and_labels[video_idx].append(
                                 lbs_length
                             )
-                        elif type_labels == 'stend':
+                        elif type_labels in ['stend', 'pipeline']:
                             left_ix, right_ix = move_window_given(sec, ix_st, len(boxes_and_labels[video_idx]),
                                                                   seq_len, video_idx)
                             labels = np.array(boxes_and_labels[video_idx][left_ix: right_ix])
@@ -258,7 +258,7 @@ def get_keyframe_data(boxes_and_labels, type_labels, seq_len, num_frames, output
 
 
                             keyframe_indices.append(
-                                (video_idx, [start_ix, end_ix], left_ix, right_ix)
+                                (video_idx, [labels, start_ix, end_ix], left_ix, right_ix)
                             )
                             keyframe_boxes_and_labels[video_idx].append(
                                 [start_ix, end_ix]
@@ -277,19 +277,6 @@ def get_keyframe_data(boxes_and_labels, type_labels, seq_len, num_frames, output
                 keyframe_boxes_and_labels[video_idx].append(
                                 cropped_labels[ix]
                             )
-            # for sec, label in enumerate():
-            #         if ix_st == -1:
-            #             ix_st = sec
-            #             current_label = label
-
-            #         if label != current_label:
-            #             if type_labels == 'class':
-            #                 keyframe_indices.append(
-            #                     (video_idx, current_label, ix_st, sec)
-            #                 )
-            #                 keyframe_boxes_and_labels[video_idx].append(
-            #                     label
-            #                 )
 
     return keyframe_indices, keyframe_boxes_and_labels
 

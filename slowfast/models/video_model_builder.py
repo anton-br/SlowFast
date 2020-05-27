@@ -397,7 +397,7 @@ class SlowFast(nn.Module):
                 dropout_rate=cfg.MODEL.DROPOUT_RATE,
                 act_func=cfg.MODEL.HEAD_ACT,
             )
-        elif cfg.DATA.LABELS_TYPE == 'stend':
+        elif cfg.DATA.LABELS_TYPE in ['stend', 'pipeline']:
             self.head = head_helper.ResNetStendHead(
                 dim_in=[
                     width_per_group * 32,
